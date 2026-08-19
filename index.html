@@ -14,10 +14,6 @@
   Así se ejecuta como página web real, con todas las animaciones.
 -->
 <style>
-  :root{
-    --shift-x: 0px;
-  }
-
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
   html,body{
@@ -90,7 +86,7 @@
     letter-spacing:.2px;
   }
 
-  /* ---------- escenario principal ---------- */
+  /* ---------- escenario principal: dos columnas fijas ---------- */
   .stage{
     position:relative;
     z-index:5;
@@ -99,36 +95,48 @@
     overflow:hidden;
   }
 
-  /* --- escena 1: árbol --- */
-  .tree-wrap{
+  /* capa exclusiva para los corazones que caen: va SOBRE el texto */
+  .falling-layer{
     position:absolute;
-    left:50%;
-    top:50%;
-    width:min(88vw, 380px);
-    transform:translate(-50%,-50%) scale(1);
-    transition:transform 1.5s cubic-bezier(.65,0,.35,1);
-    will-change:transform;
-  }
-  .tree-wrap.shift{
-    transform:translate(calc(-50% + var(--shift-x)), -50%) scale(0.74);
+    inset:0;
+    z-index:6;
+    pointer-events:none;
+    overflow:hidden;
   }
 
+  .stage-columns{
+    position:relative;
+    z-index:2;
+    height:100%;
+    display:flex;
+    align-items:center;
+    gap:clamp(8px, 3vw, 18px);
+    padding:0 clamp(10px, 4vw, 18px);
+  }
+
+  /* --- columna del árbol (izquierda) --- */
+  .tree-col{
+    flex:0 0 auto;
+    width:38%;
+    max-width:190px;
+    position:relative;
+  }
   .tree-scene{
     position:relative;
-    height:clamp(380px, 56vh, 460px);
+    height:clamp(260px, 44vh, 340px);
   }
   .ground{
     position:absolute;
-    left:-10%; right:-10%;
-    bottom:28px;
+    left:-15%; right:-15%;
+    bottom:22px;
     border-bottom:2px solid rgba(255,255,255,0.55);
   }
   .trunk{
     position:absolute;
-    bottom:28px;
+    bottom:22px;
     left:50%;
-    width:15px;
-    height:108px;
+    width:12px;
+    height:86px;
     background:linear-gradient(#8a5a2b,#5c3a1a);
     border-radius:5px 5px 0 0;
     transform-origin:bottom center;
@@ -140,7 +148,7 @@
   .canopy{
     position:absolute;
     left:50%;
-    bottom:136px; /* trunk height (108) + trunk bottom offset (28) */
+    bottom:108px; /* trunk height (86) + trunk bottom offset (22) */
     width:0;
     height:0;
   }
@@ -165,28 +173,23 @@
     animation-name:fall;
     animation-timing-function:linear;
     animation-fill-mode:forwards;
-    pointer-events:none;
   }
   @keyframes fall{
     0%   { transform: translate(0,0) rotate(0deg); opacity:1; }
     100% { transform: translate(var(--sway,20px), var(--fall,260px)) rotate(300deg); opacity:0; }
   }
 
-  /* --- escena 2: mensaje --- */
-  .text-wrap{
-    position:absolute;
-    left:5%;
-    top:50%;
-    width:min(56vw, 300px);
-    transform:translateY(-50%) translateX(-14px);
+  /* --- columna del mensaje (derecha) --- */
+  .text-col{
+    flex:1 1 auto;
+    min-width:0;
     opacity:0;
-    pointer-events:none;
+    transform:translateX(-12px);
     transition:opacity 1s ease, transform 1s ease;
   }
-  .text-wrap.show{
+  .text-col.show{
     opacity:1;
-    transform:translateY(-50%) translateX(0);
-    pointer-events:auto;
+    transform:translateX(0);
   }
   .message-panel{
     background:rgba(255,255,255,0.10);
@@ -194,14 +197,15 @@
     backdrop-filter:blur(10px);
     -webkit-backdrop-filter:blur(10px);
     border-radius:20px;
-    padding:18px 16px;
+    padding:16px 14px;
+    max-width:340px;
     box-shadow:0 12px 40px rgba(0,0,0,0.35);
   }
   .message{
     color:#fff8f2;
     font-family:'Dancing Script', cursive;
-    font-size:clamp(1.05rem, 4.6vw, 1.4rem);
-    line-height:1.5;
+    font-size:clamp(1rem, 4.4vw, 1.3rem);
+    line-height:1.48;
     white-space:pre-line;
     text-shadow:0 1px 6px rgba(0,0,0,0.35);
   }
@@ -232,17 +236,21 @@
     </div>
 
     <div class="stage" id="stage">
-      <div class="tree-wrap" id="treeWrap">
-        <div class="tree-scene" id="treeScene">
-          <div class="ground"></div>
-          <div class="trunk" id="trunk"></div>
-          <div class="canopy" id="canopy"></div>
-        </div>
-      </div>
+      <div class="falling-layer" id="fallingLayer"></div>
 
-      <div class="text-wrap" id="textWrap">
-        <div class="message-panel">
-          <div class="message" id="message"></div>
+      <div class="stage-columns">
+        <div class="tree-col">
+          <div class="tree-scene" id="treeScene">
+            <div class="ground"></div>
+            <div class="trunk" id="trunk"></div>
+            <div class="canopy" id="canopy"></div>
+          </div>
+        </div>
+
+        <div class="text-col" id="textCol">
+          <div class="message-panel">
+            <div class="message" id="message"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -308,7 +316,11 @@ Te amo hasta el infinito y más allá, mi pre-cumpleañera.`;
   }
 
   const canopy = document.getElementById('canopy');
-  const CANOPY_SCALE = 6.6;
+  const CANOPY_SCALE = 3.8; // radio de la copa ajustado a la columna angosta
+  const CANOPY_Y_SPAN = 29 * CANOPY_SCALE;   // alto aprox. de la copa
+  const TRUNK_HEIGHT = 86;
+  const GROUND_OFFSET = 22;
+  const CANOPY_ANCHOR = TRUNK_HEIGHT + GROUND_OFFSET; // 108, debe coincidir con el CSS
 
   function bloomCanopy(){
     const pointCount = 800;
@@ -331,7 +343,7 @@ Te amo hasta el infinito y más allá, mi pre-cumpleañera.`;
       heart.className = 'canopy-heart';
       heart.textContent = '❤';
       heart.style.color = colors[idx % colors.length];
-      heart.style.fontSize = (8 + Math.random()*8) + 'px';
+      heart.style.fontSize = (6 + Math.random()*6) + 'px';
       heart.style.left = (p.x * CANOPY_SCALE) + 'px';
       heart.style.bottom = ((p.y - minY) * CANOPY_SCALE) + 'px';
       heart.style.transitionDelay = (p.r*1.0 + Math.random()*0.5) + 's';
@@ -347,27 +359,48 @@ Te amo hasta el infinito y más allá, mi pre-cumpleañera.`;
     });
   }
 
-  /* ---------- 4. corazones cayendo (continuo) ---------- */
+  /* ---------- 4. corazones cayendo sobre TODO el escenario (incluido el texto) ---------- */
   function startFallingHearts(){
+    const stage = document.getElementById('stage');
     const scene = document.getElementById('treeScene');
-    const sceneHeight = scene.clientHeight;
-    const groundTop = sceneHeight - 28;
-    const canopyTop = groundTop - 136 - (29 * CANOPY_SCALE); // borde superior aprox. de la copa
+    const layer = document.getElementById('fallingLayer');
+
+    function geometry(){
+      const stageRect = stage.getBoundingClientRect();
+      const sceneRect = scene.getBoundingClientRect();
+      const canopyCenterX = sceneRect.left + sceneRect.width/2 - stageRect.left;
+      const groundY = sceneRect.top - stageRect.top + sceneRect.height - GROUND_OFFSET;
+      const canopyTopY = groundY - CANOPY_ANCHOR - CANOPY_Y_SPAN;
+      return {
+        stageWidth: stageRect.width,
+        canopyCenterX,
+        groundY,
+        canopyTopY
+      };
+    }
 
     function spawnHeart(){
+      const g = geometry();
       const heart = document.createElement('span');
       heart.className = 'falling-heart';
       heart.textContent = '❤';
       heart.style.color = colors[Math.floor(Math.random()*colors.length)];
       heart.style.fontSize = (8 + Math.random()*9) + 'px';
-      const startTop = canopyTop + 15 + Math.random()*(29*CANOPY_SCALE - 30);
-      heart.style.left = (scene.clientWidth/2 - 100 + Math.random()*200) + 'px';
-      heart.style.top = startTop + 'px';
-      const duration = 2.2 + Math.random()*2.2;
-      heart.style.setProperty('--sway', (Math.random()*90 - 45) + 'px');
-      heart.style.setProperty('--fall', (groundTop - startTop) + 'px');
+
+      const startX = g.canopyCenterX + (Math.random()*2 - 1) * (16*CANOPY_SCALE);
+      const startY = g.canopyTopY + Math.random()*CANOPY_Y_SPAN;
+      heart.style.left = startX + 'px';
+      heart.style.top = startY + 'px';
+
+      const duration = 2.4 + Math.random()*2.4;
+      // deriva mayormente hacia la derecha, para que también caigan sobre el texto
+      const maxRightDrift = Math.max(60, g.stageWidth - startX - 24);
+      const sway = -20 + Math.random()*(maxRightDrift + 20);
+      heart.style.setProperty('--sway', sway + 'px');
+      heart.style.setProperty('--fall', (g.groundY - startY + 40) + 'px');
       heart.style.animationDuration = duration + 's';
-      scene.appendChild(heart);
+
+      layer.appendChild(heart);
       setTimeout(() => heart.remove(), duration*1000);
     }
 
@@ -377,25 +410,10 @@ Te amo hasta el infinito y más allá, mi pre-cumpleañera.`;
     }, 220);
   }
 
-  /* ---------- 5. escena 2: el árbol se desplaza y aparece el texto ---------- */
-  function shiftTreeAndReveal(){
-    const wrap = document.getElementById('treeWrap');
-    const stage = document.getElementById('stage');
-    const wrapWidth = wrap.getBoundingClientRect().width;
-    const stageWidth = stage.getBoundingClientRect().width;
-    const rightMargin = Math.max(14, stageWidth * 0.03);
-    const targetCenterX = stageWidth - rightMargin - wrapWidth/2;
-    const currentCenterX = stageWidth/2;
-    const deltaX = targetCenterX - currentCenterX;
-
-    wrap.style.setProperty('--shift-x', deltaX + 'px');
-    wrap.classList.add('shift');
-
-    setTimeout(() => {
-      const textWrap = document.getElementById('textWrap');
-      textWrap.classList.add('show');
-      typeWriter(document.getElementById('message'), MENSAJE);
-    }, 900);
+  /* ---------- 5. revelar el mensaje ---------- */
+  function revealText(){
+    document.getElementById('textCol').classList.add('show');
+    typeWriter(document.getElementById('message'), MENSAJE);
   }
 
   function typeWriter(el, text, speed = 38){
@@ -420,9 +438,8 @@ Te amo hasta el infinito y más allá, mi pre-cumpleañera.`;
 
     trunk.addEventListener('transitionend', () => {
       bloomCanopy();
-      // la copa termina de florecer ~2.3s después de empezar
-      setTimeout(startFallingHearts, 1800);
-      setTimeout(shiftTreeAndReveal, 3600);
+      setTimeout(startFallingHearts, 1500);
+      setTimeout(revealText, 2100);
     }, { once:true });
   });
 </script>
